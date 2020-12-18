@@ -1,6 +1,6 @@
 <?php
 
-namespace beingnikhilesh\bootstrapform\php\Error;
+namespace beingnikhilesh\error;
 
 /*
  * Library to hold the error details or the success status
