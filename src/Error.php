@@ -9,7 +9,7 @@ namespace beingnikhilesh\error;
  *  Set the self::DETAILED_ERROR constant
  * 
  * Version 
- * v0.0.4
+ * v0.0.5
  * 
  * Changes
  *  v0.0.2
@@ -22,6 +22,9 @@ namespace beingnikhilesh\error;
  * 
  *  v0.0.4
  *      Now we can even store the process log trail in the file
+ *  v0.0.5
+ *      A lot of changes have been Made
+ *      Error Messages are now separated Error Groups
  * 
  */
 
@@ -34,41 +37,35 @@ class Error {
     //Set the status
     private static $status = 1;
     //Set the success status
-    private static $success_status = '';
+    private static $success_message = '';
     //Set the success data
     private static $success_data;
     //Set the success data indicator
     private static $success_data_set = 0;
+
     //Check if Detailed Error with Classes Backtrace is Expected
-    const DETAILED_ERROR = 0;
+    const DETAILED_ERROR = 1;
 
     function __construct() {
-        self::$error = [
-            'warnings' => [],
-            'error_messages' => [],
-            'debug' => [],
-            'other' => []
-        ];
+        self::$error = [];
     }
 
     /*
      *  Function to call the error message placeholder
      * 
      *  @param      $error_message      String to set as error message
-     *  @param      $error_type         Type of error
-     *                                      0 - Other Errors
-     *                                      1 - Error Messages
-     *                                      2 - Warnings
+     *  @param      $error_group        Name of the Group where the Error is to be Put
+     *                                  Default: General
      */
 
-    public static function set_error($error_message, $error_type = 1) {
+    public static function set_error($error_message, $error_group = 'general') {
         //Validate the input
         if ($error_message == '') {
-            self::set_error_message('Invalid Error Input Provided', 1);
+            self::set_error_message('Invalid Error Input Provided');
         }
 
         //Set the actual Error
-        self::set_error_message($error_message, $error_type);
+        self::set_error_message($error_message, $error_group);
     }
 
     /*
@@ -80,12 +77,7 @@ class Error {
         self::$error_set = 0;
         //Change the status variable
         self::$status = 1;
-        self::$error = [
-            'warnings' => [],
-            'error_messages' => [],
-            'debug' => [],
-            'other' => []
-        ];
+        self::$error = [];
     }
 
     /*
@@ -101,7 +93,7 @@ class Error {
         }
 
         //Set the actual Error
-        self::set_error_message($error_message, 3);
+        self::set_error_message($error_message, 'debug');
     }
 
     /*
@@ -117,24 +109,25 @@ class Error {
         }
 
         //Set the message
-        self::$success_status = $message;
+        self::$success_message = $message;
+        //Set Successmessage in case, success is set with Errors
+        self::set_error($message, 'success_message');
     }
 
     /*
      *  The public function to be used to set the success message
      * 
-     *  @param     $message     Success Message to be set
+     *  @param     $message     Success Data in Obj or Array Format to be set
      */
 
     public static function set_successdata($message) {
         //Verify the input
         if ($message == '') {
-            self::set_error('The Message provided is not in the appropriate form.');
+            self::set_error('The Message provided is not in the appropriate form');
         }
 
-        //Set the indicator
+        //Set the Success Data/Array/Object indicator
         self::$success_data_set = 1;
-
         //Set the message
         self::$success_data = $message;
     }
@@ -143,13 +136,10 @@ class Error {
      *  Function to call the error message placeholder
      * 
      *  @param      $error_message      String to set as error message
-     *  @param      $error_type         Type of error
-     *                                      0 - Other Errors
-     *                                      1 - Error Messages
-     *                                      2 - Warnings   
+     *  @param      $error_group        The Error Group, Default general  
      */
 
-    private static function set_error_message($error_message, $error_type) {
+    private static function set_error_message($error_message, $error_group = 'general') {
         //We would not validate the inputs as it is been send by our own method
         /*
          * The actual error is set in the Form
@@ -191,34 +181,30 @@ class Error {
             'error_heirarchy' => $heirarchy_tree
         );
 
+        //Set the error variable
+        self::$error_set = 1;
+        //Change the status variable, Avoid changing if success_message is to be set
+        if ($error_group != 'success_message')
+            self::$status = -2;
         //Store the error data
-        if ($error_type == 1) {
-            //Set the error variable
-            self::$error_set = 1;
-            //Change the status variable
-            self::$status = -2;
-            self::$error['error_messages'][] = $error_data;
-        } elseif ($error_type == 2) {
-            self::$error['warnings'][] = $error_data;
-        } elseif ($error_type == 3) {
-            self::$error['debug'][] = $error_data;
-        } else {
-            //Set the error variable
-            self::$error_set = 1;
-            //Change the status variable
-            self::$status = -2;
-            self::$error['other'][] = $error_data;
-        }
+        if ($error_group == '')
+            self::$error['general'][] = $error_data;
+        else
+            self::$error[$error_group][] = $error_data;
+
+        return;
     }
 
     /*
      *  Function to get the error
      * 
-     *  @param      $view               Need an extended view or condensed view
+     *  @param      $error_group        Specific Name of the Group of which to fetch the Error
+     *  @param      $append_group       Append the Error Group name at the start of the Group
+     *                                  E.g. Error Group Name: Error
      *  @return     string   
      */
 
-    public static function get_error($view = FALSE) {
+    public static function get_error($error_group = '', $append_error_group = FALSE) {
         /*
          * We've to decide if the user needs an extended view or a normal view
          *  Normal View
@@ -231,54 +217,57 @@ class Error {
          */
 
         //Declare the varibles
-        $return_variable = '';
+        $parse_array = [];
+        $return_variable = $error_message = '';
+        $ret_array = [];
 
-        //Merge all the errors
-        foreach (self::$error['error_messages'] as $key => $val) {
-            $total_resulting_array[] = $val;
+        //Get the Errors, check if only one Error Group is required or all
+        if ($error_group != '' AND isset(self::$error[$error_group])) {
+            //Parse only the Error Group
+            $parse_array[$error_group] = self::$error[$error_group];
+        } else {
+            //Parse the Whole Error Array
+            $parse_array = self::$error;
         }
-        if (isset(self::$error['other']))
-            foreach (self::$error['other'] as $key => $val) {
-                $total_resulting_array[] = $val;
-            }
-        if (isset(self::$error['warnings']))
-            foreach (self::$error['warnings'] as $key => $val) {
-                $total_resulting_array[] = $val;
-            }
-        if (isset(self::$error['debug']))
-            foreach (self::$error['debug'] as $key => $val) {
-                $total_resulting_array[] = $val;
-            }
 
-        //If error is set
+        //Generate the Errors, if set
         if (self::$error_set) {
             //Return the error message
-            foreach ($total_resulting_array as $key => $val) {
-                $return_variable .= $val['message'] . '<br />';
-                //The user needs detailed view
-                if (self::DETAILED_ERROR) {
-                    //$return_variable .= 'Line - '.$val['line_no'].', Method - '.$val['method'].', Class - '.$val['class']. '<br />';
-                    //$return_variable .= 'Function - '.$val['function'].', Time - '.$val['time'].'<br />';
-                    $return_variable .= 'Error Line - ' . $val['line_no'] . ', Calling Function - ' . $val['method'] . ', Calling Class - ' . $val['class'] . '<br />';
-                    $return_variable .= 'Executing Function - ' . $val['function'] . ', Time - ' . $val['time'] . '<br />';
-                    $return_variable .= 'Heirarchy - ' . $val['error_heirarchy'] . '<br />';
+            foreach ($parse_array as $k => $v) {
+                foreach ($v AS $key => $val) {
+
+                    if ($append_error_group OR $k == 'success_message')
+                        $error_message .= $k . ': ';
+                    $error_message .= $val['message'];
+                    //Put the error in array
+                    $ret_array[] = $error_message;
+                    //Assign and nullify the $error_message
+                    if ($return_variable != '')
+                        $return_variable .= '<br />' . $error_message;
+                    else
+                        $return_variable .= $error_message;
+                    $error_message = '';
+                    //The user needs detailed view
+                    if (self::DETAILED_ERROR) {
+                        $return_variable .= '<br />Error Line - ' . $val['line_no'] . ', Calling Function - ' . $val['method'] . ', Calling Class - ' . $val['class'] . '<br />';
+                        $return_variable .= 'Executing Function - ' . $val['function'] . ', Time - ' . $val['time'] . '<br />';
+                        $return_variable .= 'Heirarchy - ' . $val['error_heirarchy'];
+                    }
                 }
             }
         } else {
             return [self::$status, 'No errors in the execution.'];
         }
 
-        return [self::$status, $return_variable];
+        return [self::$status, $return_variable, $ret_array];
     }
 
     /*
-     *  Function to get the error
-     * 
-     *  @param      $view               Need an extended view or condensed view
+     *  Function to get the Success Message or Error
      *  @return     string   
      */
 
-    public static function get_success_data($view = TRUE, $error_data = FALSE) {
+    public static function get_success_data() {
         /*
          * We've to decide if the user needs an extended view or a normal view
          *  Normal View
@@ -295,48 +284,17 @@ class Error {
          * 
          */
 
-        //First of all check if success data is set
-        if (self::$success_data_set) {
+        //First of all check if success data is set, i.e. some array or object to Return;
+        if (self::$success_data_set == 1) {
             //We've to return the data set
-            return [1, self::$success_data];
+            return [self::$status, self::$success_data];
         }
-
-        //Declare the varibles
-        $return_variable = '';
-        $total_resulting_array = [];
-
-        if (self::DETAILED_ERROR) {
-            $error_data = TRUE;
-        }
-
-        //Merge all the Warnings
-        if (isset(self::$error['warnings']) AND ( count(self::$error['warnings']) > 0)) {
-            foreach (self::$error['warnings'] as $key => $val) {
-                $total_resulting_array[] = $val;
-            }
-        }
-
 
         //If error is set
-        if (!self::$error_set && count($total_resulting_array) > 0) {
-            //Append the message first
-            $return_variable .= '<b>' . self::$success_status . '</b><br />';
-            $return_variable .= '   But there are some warnings.<br />';
-            //Return the error message
-            foreach ($total_resulting_array as $key => $val) {
-                $return_variable .= (($error_data) ? '<b>      ' . $val['message'] . '</b><br />' : '      ' . $val['message'] . '<br />');
-                //The user needs detailed view
-                if ($error_data) {
-                    $return_variable .= '      Error Line - ' . $val['line_no'] . ', Calling Function - ' . $val['method'] . ', Calling Class - ' . $val['class'] . '<br />';
-                    $return_variable .= '      Executing Function - ' . $val['function'] . ', Time - ' . $val['time'] . '<br />';
-                    $return_variable .= '      Heirarchy - ' . $val['error_heirarchy'] . '<br />';
-                }
-            }
-        } else {
-            return [1, self::$success_status];
-        }
-
-        return [1, $return_variable];
+        if (self::$status)
+            return [self::$status, self::$success_message];
+        else
+            return self::get_error();
     }
 
     /*
@@ -358,51 +316,42 @@ class Error {
     /*
      *  The public function to be used by all the controllers while data returning
      * 
-     *  @return     $status      status of the error message.
+     *  @param      $append_error_group     Append the Name of the Error Group
+     *  @param      $get_array              Get Errors in an Array
+     *  @return     $status                 status of the error message.
      */
 
-    public static function get_returndata() {
-        if (!self::$error_set) {
-            return self::get_success_data();
-        } else {
-            return self::get_error();
-        }
+    public static function get_returndata($append_error_group = FALSE, $get_array = FALSE) {
+        $errors = self::get_error('', $append_error_group);
+        if ($get_array)
+            return [$errors[0], $errors[2]];
+        else
+            return [$errors[0], $errors[1]];
     }
 
     /*
      *  The public function to check if error is present
      * 
-     *  @param      $check_success  Boolean
+     *  @param      $error_group            Error Group to check the Error for
+     *                                      If not set, Error if any is checked
      *  @return     boolean TRUE/FALSE
      */
 
-    public static function check_error($check_success = FALSE) {
-        /*
-         *  If $check_success is set means that we need to check if success message is set and return false if yes
-         */
-
-        if (self::$error_set > 0) {
-            //There is error
-            return FALSE;
-        }
-
-        if ($check_success) {
-            $return_data = self::get_returndata();
-            if ($return_data[0] == 1 && self::warnings_set()) {
+    public static function check_error($error_group = '') {
+        //Check if to check error for a specific Group Only
+        if ($error_group != '') {
+            //Check if error exists for the mentioned Group, if key is set, it means error Exists
+            if (isset(self::$error[$error_group]))
+                return FALSE;
+        }else {
+            if (self::$error_set > 0) {
+                //There is error
                 return FALSE;
             }
         }
 
         //Means there is no error yet.
         return TRUE;
-    }
-
-    public static function warnings_set() {
-        if (count(self::$error['warnings']) > 0) {
-            return TRUE;
-        }
-
-        return FALSE;
     }
 
 }
