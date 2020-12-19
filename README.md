@@ -1,2 +1,2 @@
-# error
- Library to Generic Store Errors and return them as needed
+# Error Library
+ Generic PHP Library to Store Errors and return them as needed
