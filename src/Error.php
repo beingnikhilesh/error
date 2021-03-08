@@ -9,7 +9,7 @@ namespace beingnikhilesh\error;
  *  Set the self::DETAILED_ERROR constant
  * 
  * Version 
- * v0.0.5
+ * v0.0.7
  * 
  * Changes
  *  v0.0.2
@@ -25,6 +25,11 @@ namespace beingnikhilesh\error;
  *  v0.0.5
  *      A lot of changes have been Made
  *      Error Messages are now separated Error Groups
+ *  v0.0.6
+ *      Fixed a small bug which caused error to be set to 1 even if successmessage is set to TRUE
+ *      Changes the way returndata function works
+ *  v0.0.7
+ *      Fixed a Small Error in error_lib::get_returndata function
  * 
  */
 
@@ -44,7 +49,7 @@ class Error {
     private static $success_data_set = 0;
 
     //Check if Detailed Error with Classes Backtrace is Expected
-    const DETAILED_ERROR = 1;
+    const DETAILED_ERROR = 0;
 
     function __construct() {
         self::$error = [];
@@ -181,11 +186,12 @@ class Error {
             'error_heirarchy' => $heirarchy_tree
         );
 
-        //Set the error variable
-        self::$error_set = 1;
         //Change the status variable, Avoid changing if success_message is to be set
-        if ($error_group != 'success_message')
+        if ($error_group != 'success_message') {
+            //Set the error variable
+            self::$error_set = 1;
             self::$status = -2;
+        }
         //Store the error data
         if ($error_group == '')
             self::$error['general'][] = $error_data;
@@ -222,7 +228,7 @@ class Error {
         $ret_array = [];
 
         //Get the Errors, check if only one Error Group is required or all
-        if ($error_group != '' AND isset(self::$error[$error_group])) {
+        if (!empty($error_group) AND isset(self::$error[$error_group])) {
             //Parse only the Error Group
             $parse_array[$error_group] = self::$error[$error_group];
         } else {
@@ -256,7 +262,7 @@ class Error {
                 }
             }
         } else {
-            return [self::$status, 'No errors in the execution.'];
+            return [self::$status, ''];
         }
 
         return [self::$status, $return_variable, $ret_array];
@@ -321,12 +327,18 @@ class Error {
      *  @return     $status                 status of the error message.
      */
 
-    public static function get_returndata($append_error_group = FALSE, $get_array = FALSE) {
-        $errors = self::get_error('', $append_error_group);
-        if ($get_array)
-            return [$errors[0], $errors[2]];
-        else
-            return [$errors[0], $errors[1]];
+    public static function get_returndata($error_group = '', $append_error_group = FALSE, $get_array = FALSE) {
+        //Check if error
+        if (!self::check_error()) {
+            //This is an error
+            $errors = self::get_error($error_group, $append_error_group);
+            if ($get_array)
+                return [$errors[0], $errors[2]];
+            else
+                return [$errors[0], $errors[1]];
+        }else {
+            return self::get_success_data();
+        }
     }
 
     /*
